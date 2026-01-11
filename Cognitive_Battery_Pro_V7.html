@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cognitive Assessment Battery (Progress Edition)</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --child-accent: #FF9800;
+            --success: #27ae60;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #333;
+            --fan-stroke: #555;
+            --mic-active: #e74c3c;
+        }
+
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; min-height: 100vh; touch-action: manipulation; }
+        
+        /* 布局 */
+        .container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; width: 100%; box-sizing: border-box; }
+        .view-section { display: none; width: 100%; max-width: 850px; animation: fadeIn 0.4s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 卡片 */
+        .card { background: var(--card-bg); padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 20px; position: relative; }
+        .card.child-mode { border-top: 8px solid var(--child-accent); background: #fffbf0; border-radius: 20px; }
+        
+        /* 顶部导航 */
+        header { background: var(--card-bg); padding: 12px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .brand { font-size: 1.2em; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        
+        .lang-switch { display: flex; gap: 5px; }
+        .lang-switch button { padding: 6px 10px; cursor: pointer; border: 1px solid #ddd; background: #f8f9fa; border-radius: 6px; font-size: 13px; transition: all 0.2s; }
+        .lang-switch button.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .lang-switch button.child-active { background: var(--child-accent); color: white; border-color: var(--child-accent); font-weight: bold; }
+
+        /* 表单与按钮 */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; color: #555; font-size: 0.95em; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; background: #fff; appearance: none; }
+        input:focus, select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(52,152,219,0.1); }
+        
+        .btn { padding: 14px 35px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.1s, background 0.2s; -webkit-tap-highlight-color: transparent; }
+        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 6px rgba(44,62,80,0.2); }
+        .btn-success { background: var(--success); color: white; box-shadow: 0 4px 6px rgba(39,174,96,0.2); }
+        .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); padding: 8px 20px; font-size: 14px; }
+        
+        /* 儿童版按钮覆盖 */
+        .child-mode .btn-primary { background: var(--child-accent); color: #fff; }
+        .child-mode .btn-success { background: #8bc34a; }
+
+        /* 进度条组件 (NEW) */
+        .progress-box { margin: 0 0 20px 0; }
+        .progress-track { background: #e9ecef; height: 12px; border-radius: 6px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); }
+        .progress-fill { height: 100%; background: var(--success); width: 0%; transition: width 0.3s ease-out; }
+        .child-mode .progress-fill { background: var(--child-accent); }
+        .progress-text { text-align: right; font-size: 0.85em; color: #666; margin-top: 4px; font-weight: bold; font-family: monospace; }
+
+        /* 语音按钮 */
+        .btn-mic { 
+            background: #f1f3f5; border: 1px solid #ddd; color: #555; padding: 0 20px; font-size: 1.5em; border-radius: 8px; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-mic.recording { 
+            background: var(--mic-active); color: white; border-color: var(--mic-active); 
+            animation: pulse 1.5s infinite; 
+        }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); } }
+
+        /* 输入提示气泡 */
+        .input-hint {
+            position: absolute; top: 125px; left: 30px; /* Adjusted top */
+            background: #333; color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 12px;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 10;
+        }
+        .input-hint.show { opacity: 1; }
+
+        /* 测试组件 */
+        .big-word { font-size: 4em; font-weight: bold; text-align: center; height: 180px; display: flex; align-items: center; justify-content: center; color: var(--primary); margin: 20px 0; }
+        .child-mode .big-word { color: var(--child-accent); font-family: "KaiTi", "楷体", "Comic Sans MS", cursive; }
+
+        .chips-container { display: flex; flex-wrap: wrap; gap: 8px; min-height: 60px; padding: 15px; background: #f8f9fa; border-radius: 8px; margin: 15px 0; border: 1px dashed #ccc; }
+        .chip { background: var(--accent); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 15px; animation: popIn 0.3s; user-select: none; }
+        
+        .grid-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+        .grid-btn { padding: 16px 5px; background: #f1f3f5; border: 1px solid #e9ecef; border-radius: 8px; cursor: pointer; font-size: 16px; color: var(--text); transition: all 0.2s; font-weight: 500; }
+        .grid-btn.selected { background: var(--primary); color: white; transform: scale(0.98); }
+        .child-mode .grid-btn.selected { background: var(--child-accent); }
+
+        /* SDMT 适配 */
+        .svg-container { width: 100%; max-width: 680px; margin: 0 auto 20px auto; aspect-ratio: 1.7 / 1; }
+        .sdmt-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 420px; margin: 10px auto; }
+        .key-btn { padding: 22px 0; font-size: 1.8em; background: white; border: 1px solid #ccc; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 0 #999; color: #333; }
+        .key-btn:active { box-shadow: 0 1px 0 #999; transform: translateY(3px); background: #f0f0f0; }
+
+        /* SVG */
+        .arc-path { fill: white; stroke: var(--fan-stroke); stroke-width: 1.5; }
+        .arc-text { font-family: Arial, sans-serif; font-weight: bold; fill: black; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+        .highlight-border { fill: none; stroke: var(--success); stroke-width: 5px; opacity: 0; transition: opacity 0.1s; }
+        .highlight-border.active { opacity: 1; }
+
+        /* 结果与管理 */
+        table.result-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.95em; }
+        table.result-table th, table.result-table td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        table.result-table th { background: #f8f9fa; font-weight: 600; }
+        
+        .backup-area { margin-top: 20px; padding: 15px; background: #f1f3f5; border-radius: 8px; display: none; }
+        .backup-area.visible { display: block; }
+        textarea { width: 100%; height: 120px; font-family: 'Consolas', monospace; font-size: 12px; margin-bottom: 10px; border: 1px solid #ced4da; border-radius: 4px; padding: 8px; }
+
+        #admin-panel { position: fixed; top: 60px; right: 20px; width: 280px; background: white; border: 1px solid #ddd; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 1000; border-radius: 12px; }
+
+        .hidden { display: none; }
+        .text-center { text-align: center; }
+        .timer-badge { background: #e9ecef; padding: 5px 12px; border-radius: 20px; font-family: monospace; font-weight: bold; color: #495057; }
+
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .card { padding: 20px; }
+            .form-grid { grid-template-columns: 1fr; gap: 15px; }
+            .grid-options { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .svg-container { max-width: 100%; }
+            #admin-panel { width: 85%; right: 5%; left: 5%; top: 70px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <span style="font-size:1.4em;">🧠</span>
+        <span id="app-title" style="display:none; sm:block;">认知评估</span>
+    </div>
+    <div class="lang-switch">
+        <button onclick="changeVersion('zh')" id="btn-zh" class="active">中文</button>
+        <button onclick="changeVersion('en')" id="btn-en">En</button>
+        <button onclick="changeVersion('child')" id="btn-child">儿童</button>
+    </div>
+    <button onclick="toggleAdmin()" style="margin-left:auto; cursor:pointer; background:none; border:none; font-size:1.4em; padding:5px;">⚙️</button>
+</header>
+
+<div id="admin-panel" class="hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h4 style="margin:0;">💾 历史数据</h4>
+        <button onclick="toggleAdmin()" style="border:none; background:none; font-size:1.5em; cursor:pointer;">&times;</button>
+    </div>
+    <div id="history-list" style="max-height:150px; overflow-y:auto; font-size:0.85em; margin-bottom:15px; border:1px solid #eee; padding:5px; background:#f9f9f9;"></div>
+    <button class="btn btn-outline" style="width:100%; padding:8px; font-size:0.9em; margin-bottom:20px;" onclick="clearHistory()">清空历史</button>
+    <h4 style="margin:0 0 10px 0;">🔧 答案设置</h4>
+    <div style="font-size:0.9em; margin-bottom:15px;">
+        <label>地点</label><input type="text" id="set-place" value="医院" style="width:100%; margin-bottom:8px; padding:8px;">
+        <label>城市</label><input type="text" id="set-city" value="北京" style="width:100%; padding:8px;">
+    </div>
+    <button class="btn btn-primary" style="width:100%; padding:10px; font-size:0.9em;" onclick="saveSettings()">保存设置</button>
+</div>
+
+<div class="container">
+
+    <div id="view-home" class="view-section active">
+        <div class="card text-center">
+            <h1 id="lbl-welcome" style="margin-bottom:10px;">欢迎使用</h1>
+            <p id="lbl-desc" style="color:#666; margin-bottom:30px;">标准化数字认知评估套件 (Progress)</p>
+            <div style="text-align: left; max-width: 400px; margin: 0 auto 30px auto; background:#f8f9fa; padding:20px; border-radius:10px;">
+                <ul style="padding-left:20px; margin:0; line-height: 1.8;">
+                    <li><strong><span id="t1-name">10词回忆</span></strong>: <span id="t1-desc">语音/键盘输入</span></li>
+                    <li><strong><span id="t2-name">MoCA定向</span></strong>: <span id="t2-desc">时空定向</span></li>
+                    <li><strong><span id="t3-name">10词再认</span></strong>: <span id="t3-desc">延迟记忆</span></li>
+                    <li><strong><span id="t4-name">处理速度</span></strong>: SDMT (60s)</li>
+                </ul>
+            </div>
+            <button class="btn btn-primary" onclick="initAssessment()">开始评估</button>
+        </div>
+    </div>
+
+    <div id="view-register" class="view-section">
+        <div class="card">
+            <h2 id="reg-title">受试者信息</h2>
+            <div class="form-grid">
+                <div><label id="lbl-p-name">姓名</label><input type="text" id="p_name"></div>
+                <div><label id="lbl-p-id">登记号</label><input type="text" id="p_id"></div>
+                <div><label id="lbl-p-gender">性别</label><select id="p_gender"><option value="M">Male / 男</option><option value="F">Female / 女</option></select></div>
+                <div><label id="lbl-p-dob">出生日期</label><input type="date" id="p_dob" onchange="calcAge()"></div>
+                <div><label id="lbl-p-age">年龄</label><input type="number" id="p_age" readonly style="background:#e9ecef;"></div>
+                <div><label id="lbl-p-edu">教育/年级</label><select id="p_edu"></select></div>
+            </div>
+            <div class="text-center"><button class="btn btn-primary" onclick="submitRegister()">下一步</button></div>
+        </div>
+    </div>
+
+    <div id="view-t1-intro" class="view-section">
+        <div class="card text-center">
+            <h2 id="t1-intro-title">10词回忆</h2>
+            <p id="t1-intro-text" style="font-size:1.1em; margin:20px 0;">...</p>
+            <button class="btn btn-primary" onclick="startWordSerial('t1')">开始记忆</button>
+        </div>
+    </div>
+
+    <div id="view-serial-display" class="view-section">
+        <div class="card text-center">
+            <div id="serial-word" class="big-word">...</div>
+            <p id="serial-counter" style="color:#888; font-weight:bold;">0/10</p>
+        </div>
+    </div>
+
+    <div id="view-t1-recall" class="view-section">
+        <div class="card">
+            <h2 id="t1-recall-title">回忆阶段</h2>
+            
+            <div class="progress-box">
+                <div class="progress-track"><div id="t1-bar" class="progress-fill"></div></div>
+                <div id="t1-progress-text" class="progress-text">0 / 10</div>
+            </div>
+
+            <p id="t1-recall-desc" style="margin-bottom:15px;">请输入...</p>
+            
+            <div style="display:flex; gap:10px; position: relative;">
+                <button id="btn-mic" class="btn-mic" onclick="toggleSpeech()" title="点击语音输入">🎤</button>
+                <input type="text" id="t1-input" autocomplete="off" placeholder="输入一个词..." style="flex:1;">
+                <button class="btn btn-primary" onclick="t1AddWord()" id="btn-add" style="padding:12px 20px; white-space: nowrap;">添加</button>
+                <div id="input-hint" class="input-hint">每次仅限一词，请点击添加</div>
+            </div>
+            
+            <div id="t1-chips" class="chips-container"></div>
+            <div class="text-center">
+                <button class="btn btn-success" onclick="endT1()" id="btn-finish-t1">完成本节</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-t2" class="view-section">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 id="t2-title" style="margin:0;">定向力</h2>
+                <span class="timer-badge" id="t2-timer">0.0s</span>
+            </div>
+            <div id="t2-area" style="min-height:200px; margin-top:20px;">
+                <h3 id="t2-q-text" style="margin-bottom:20px;">Q</h3>
+                <div id="t2-q-input"></div>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn btn-primary" onclick="t2Next()" id="btn-next-q">下一题</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-t3-intro" class="view-section">
+        <div class="card text-center">
+            <h2 id="t3-intro-title">10词再认</h2>
+            <p id="t3-intro-text" style="font-size:1.1em; margin:20px 0;">...</p>
+            <button class="btn btn-primary" onclick="startWordSerial('t3')">开始记忆新单词</button>
+        </div>
+    </div>
+
+    <div id="view-t3-test" class="view-section">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 id="t3-test-title" style="margin:0;">再认选择</h2>
+                <span class="timer-badge" id="t3-timer">0s</span>
+            </div>
+            
+            <div class="progress-box" style="margin-top:15px;">
+                <div class="progress-track"><div id="t3-bar" class="progress-fill"></div></div>
+                <div id="t3-progress-text" class="progress-text">0 / 10</div>
+            </div>
+
+            <p id="t3-test-desc">...</p>
+            <div id="t3-grid" class="grid-options"></div>
+            <div class="text-center" style="margin-top:30px;">
+                <button class="btn btn-success" onclick="endT3()" id="btn-finish-t3">完成本节</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-t4-intro" class="view-section">
+        <div class="card text-center">
+            <h2 id="t4-intro-title">处理速度</h2>
+            <p id="t4-intro-text" style="font-size:1.1em; margin:20px 0;">...</p>
+            <p><strong><span id="lbl-duration">时长</span>: 60s</strong></p>
+            <button class="btn btn-primary" onclick="startT4()" id="btn-start-t4">开始测试</button>
+        </div>
+    </div>
+
+    <div id="view-t4-test" class="view-section">
+        <div class="card text-center">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <span class="timer-badge">⏱ <span id="t4-countdown">60</span>s</span>
+                <span class="timer-badge"><span id="lbl-score">得分</span>: <span id="t4-score">0</span></span>
+            </div>
+            <div class="svg-container"><svg id="sdmt-svg" viewBox="0 0 500 280" preserveAspectRatio="xMidYMax meet" style="width:100%; height:100%;"></svg></div>
+            <div class="big-word" id="t4-current-symbol" style="height:80px; margin:10px 0;">?</div>
+            <div class="sdmt-keypad">
+                <button class="key-btn" onclick="t4Input(1)">1</button><button class="key-btn" onclick="t4Input(2)">2</button><button class="key-btn" onclick="t4Input(3)">3</button>
+                <button class="key-btn" onclick="t4Input(4)">4</button><button class="key-btn" onclick="t4Input(5)">5</button><button class="key-btn" onclick="t4Input(6)">6</button>
+                <button class="key-btn" onclick="t4Input(7)">7</button><button class="key-btn" onclick="t4Input(8)">8</button><button class="key-btn" onclick="t4Input(9)">9</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-report" class="view-section">
+        <div class="card">
+            <h2 id="report-title">评估报告</h2>
+            <div id="report-content" style="overflow-x: auto;"></div>
+            <div class="text-center" style="margin-top:25px;">
+                <button class="btn btn-success" onclick="exportData()">📥 <span id="btn-dl">保存 CSV</span></button>
+                <button class="btn btn-outline" onclick="location.reload()" style="margin-left:10px;">🔄 <span id="btn-new">新受试者</span></button>
+            </div>
+            <div style="margin-top:30px; text-align:left; border-top:1px solid #eee; padding-top:15px;">
+                <p style="font-size:0.85em; color:#999; cursor:pointer;" onclick="toggleBackup()">⚠️ 无法下载？点击此处显示原始数据 (备份)</p>
+                <div id="backup-box" class="backup-area">
+                    <textarea id="raw-data-area" readonly onclick="this.select()"></textarea>
+                    <button class="btn btn-outline" style="font-size:0.8em; padding:6px 15px; background:white;" onclick="copyRawData()">📋 复制</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+/** 1. 词汇库 **/
+const POOLS = {
+    zh: ["教堂", "天鹅绒", "面孔", "菊花", "红色", "月亮", "小船", "窗户", "钢琴", "鼻子", "香蕉", "河流", "医生", "宫殿", "火柴", "手表", "铅笔", "镜子", "苹果", "房子", "老虎", "街道", "书本", "椅子", "玫瑰", "士兵", "大象", "钱包", "电灯", "森林", "大海", "面包", "卡车", "围巾", "吉他", "雨伞", "眼镜", "电话", "牙刷", "电脑"],
+    child: ["气球", "熊猫", "西瓜", "积木", "红旗", "火车", "小猫", "书包", "铅笔", "月亮", "太阳", "苹果", "牛奶", "桌子", "椅子", "大树", "小鸟", "飞机", "皮球", "糖果", "兔子", "风筝", "雪人", "雨伞", "鞋子", "帽子", "蝴蝶", "青蛙", "汽车", "房子", "老虎", "狮子", "香蕉", "草莓", "冰淇淋", "机器人", "画笔", "书本", "滑梯", "秋千"],
+    en: ["Church", "Velvet", "Face", "Daisy", "Red", "Moon", "Boat", "Window", "Piano", "Nose", "Banana", "River", "Doctor", "Palace", "Match", "Watch", "Pencil", "Mirror", "Apple", "House", "Tiger", "Street", "Book", "Chair", "Rose", "Soldier", "Elephant", "Wallet", "Lamp", "Forest", "Ocean", "Bread", "Truck", "Scarf", "Guitar", "Umbrella", "Glasses", "Phone", "Toothbrush", "Computer"]
+};
+
+// 界面文本
+const TEXT = {
+    zh: { title: "综合认知评估系统", welcome: "欢迎使用", t1n: "10词回忆", t2n: "定向力", t3n: "10词再认", t4n: "处理速度", t1d: "即时记忆", t2d: "时空定向", t3d: "再认记忆", p_name: "姓名", p_id: "登记号", p_edu: "教育水平", p_dob: "出生日期", p_age: "年龄", btn_next: "下一步", btn_add: "添加", btn_finish: "完成本节", btn_start: "开始", t1_intro: "屏幕将逐个显示10个单词 (2秒/个)，请努力记住它们。", t3_intro: "现在将学习一组全新的10个单词，随后进行测试。", t3_test: "请点击刚才(第二组)看到的单词。", t2_q: ["今年是哪一年?","现在是几月份?","今天是几号?","今天是星期几?","我们现在在哪(地点)?","我们在哪个城市?"], edu_opts: ["小学","初中","高中","本科","研究生及以上"], t4_intro: "请参照扇形图例，尽快按下符号对应的数字键。", duration: "时长", report_title: "评估报告", score: "得分", time: "耗时", btn_dl: "下载 CSV (以登记号命名)", btn_new: "新受试者" },
+    en: { title: "Cognitive Battery", welcome: "Welcome", t1n: "Recall", t2n: "Orientation", t3n: "Recognition", t4n: "Speed", t1d: "Immediate Memory", t2d: "Time & Space", t3d: "New List Recognition", p_name: "Name", p_id: "ID", p_edu: "Education", p_dob: "DOB", p_age: "Age", btn_next: "Next", btn_add: "Add", btn_finish: "Finish", btn_start: "Start", t1_intro: "10 words will be shown (2s each). Remember them.", t3_intro: "You will now learn a NEW list of 10 words.", t3_test: "Select the words from the NEW list.", t2_q: ["What year is it?","What month is it?","What date is it?","What day is it?","Where are we?","What city is it?"], edu_opts: ["Primary","Middle","High School","Bachelor","Master+"], t4_intro: "Match symbols to numbers using the fan key.", duration: "Duration", report_title: "Assessment Report", score: "Score", time: "Time", btn_dl: "Save CSV", btn_new: "New Subject" },
+    child: { title: "儿童趣味测试", welcome: "你好，小朋友！", t1n: "记词游戏", t2n: "我在哪里", t3n: "找词游戏", t4n: "找符号", t1d: "看谁记得多", t2d: "时间与地点", t3d: "认出新朋友", p_name: "姓名", p_id: "学号", p_edu: "年级", p_dob: "生日", p_age: "几岁了", btn_next: "下一步", btn_add: "记住了", btn_finish: "做完了", btn_start: "开始游戏", t1_intro: "屏幕上会出现一些词语，看仔细并记住它们哦！", t3_intro: "现在我们再记一组新的词语，要看仔细哦。", t3_test: "请把刚才(第二组)看到的词语找出来。", t2_q: ["今年是哪一年?","现在是几月份?","今天是几号?","今天是星期几?","这是什么学校/地方?","我们在哪个城市?"], edu_opts: ["幼儿园","一年级","二年级","三年级","四年级","五年级","六年级","初中"], t4_intro: "看上面的扇子，把符号对应的数字找出来，越快越好！", duration: "时间", report_title: "测试报告", score: "分数", time: "用时", btn_dl: "保存结果", btn_new: "下一个小朋友" }
+};
+
+const CSV_LABELS = {
+    zh: { section: "模块", item: "项目", value: "数值", info: "基础信息", name: "姓名", id: "登记号", gender: "性别", age: "年龄", dob: "出生日期", edu: "教育水平", date: "检查日期", t1: "T1_回忆", raw: "输入内容", time: "耗时(s)", hits: "正确数", intrusions: "错误/虚构", t2: "T2_定向", score: "总分", q: "问题", ans: "回答", correct: "正确否", t3: "T3_再认", errors: "错误数", miss: "漏选数", t4: "T4_速度" },
+    en: { section: "Section", item: "Item", value: "Value", info: "Info", name: "Name", id: "ID", gender: "Gender", age: "Age", dob: "DOB", edu: "Education", date: "Date", t1: "T1_Recall", raw: "Input", time: "Time(s)", hits: "Hits", intrusions: "Intrusions", t2: "T2_Orientation", score: "Score", q: "Question", ans: "Answer", correct: "IsCorrect", t3: "T3_Recognition", errors: "Errors", miss: "Missed", t4: "T4_Speed" },
+    child: { section: "模块", item: "项目", value: "数值", info: "基础信息", name: "姓名", id: "学号", gender: "性别", age: "年龄", dob: "生日", edu: "年级", date: "日期", t1: "T1_记词", raw: "输入内容", time: "耗时(s)", hits: "记对数量", intrusions: "记错数量", t2: "T2_定向", score: "总分", q: "问题", ans: "回答", correct: "正确否", t3: "T3_找词", errors: "选错数", miss: "漏选数", t4: "T4_找符号" }
+};
+
+const SDMT_MAP = [{n:1, s:'∥'}, {n:2, s:'∩'}, {n:3, s:'╲'}, {n:4, s:'⨆'}, {n:5, s:'≠'}, {n:6, s:']'}, {n:7, s:'['}, {n:8, s:'∪'}, {n:9, s:'≈'}];
+
+// State
+let version = 'zh'; 
+let session = { patient: {}, t1: { targets: [], entered: [], time: 0 }, t2: { details: [], score: 0, time: 0 }, t3: { targets: [], distractors: [], hits: 0, errors: 0, time: 0 }, t4: { score: 0, errors: 0, time: 60, responses: [] } };
+let adminSettings = { place: "医院", city: "北京" };
+let recognition = null;
+let isRecording = false;
+
+window.onload = function() {
+    changeVersion('zh');
+    loadHistory();
+    const savedSet = localStorage.getItem('cog_admin_set');
+    if(savedSet) adminSettings = JSON.parse(savedSet);
+    document.getElementById('set-place').value = adminSettings.place;
+    document.getElementById('set-city').value = adminSettings.city;
+    
+    // 输入限制
+    const input = document.getElementById('t1-input');
+    input.addEventListener('input', function(e) {
+        if (this.value.match(/[\s,，.。;；]/)) {
+            this.value = this.value.replace(/[\s,，.。;；]/g, '');
+            showHint();
+        }
+    });
+    input.addEventListener('keypress', function(e) { if(e.key==='Enter') t1AddWord(); });
+};
+
+function showHint() {
+    const hint = document.getElementById('input-hint');
+    hint.classList.add('show');
+    if(navigator.vibrate) navigator.vibrate(100);
+    setTimeout(()=>hint.classList.remove('show'), 2000);
+}
+
+// Progress Helper
+function updateProgress(barId, textId, current, total) {
+    const pct = Math.min(100, (current / total) * 100);
+    document.getElementById(barId).style.width = pct + '%';
+    document.getElementById(textId).innerText = `${current} / ${total}`;
+}
+
+function preloadVoicePermission() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    try {
+        const testRec = new SpeechRecognition();
+        testRec.start(); 
+        setTimeout(() => { testRec.stop(); }, 100);
+    } catch (e) { console.log("Permission handled"); }
+}
+
+function toggleSpeech() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Browser not supported");
+    if (isRecording) { recognition.stop(); return; }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = version === 'en' ? 'en-US' : 'zh-CN';
+    recognition.continuous = false; 
+    recognition.interimResults = false;
+
+    recognition.onstart = function() {
+        isRecording = true;
+        document.getElementById('btn-mic').classList.add('recording');
+    };
+    recognition.onend = function() {
+        isRecording = false;
+        document.getElementById('btn-mic').classList.remove('recording');
+    };
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        const firstWord = transcript.split(/[\s,，.。]/)[0];
+        if(firstWord) {
+            document.getElementById('t1-input').value = firstWord;
+            document.getElementById('t1-input').focus();
+        }
+    };
+    recognition.start();
+}
+
+function changeVersion(v) {
+    version = v;
+    document.querySelectorAll('.lang-switch button').forEach(b => b.classList.remove('active', 'child-active'));
+    document.getElementById(`btn-${v}`).classList.add(v === 'child' ? 'child-active' : 'active');
+    document.querySelectorAll('.card').forEach(c => {
+        if(v === 'child') c.classList.add('child-mode');
+        else c.classList.remove('child-mode');
+    });
+    updateLabels();
+}
+
+function updateLabels() {
+    const t = TEXT[version];
+    document.getElementById('app-title').innerText = t.title;
+    document.getElementById('lbl-welcome').innerText = t.welcome;
+    document.getElementById('t1-name').innerText = t.t1n; document.getElementById('t1-desc').innerText = t.t1d;
+    document.getElementById('t2-name').innerText = t2n = t.t2n; document.getElementById('t2-desc').innerText = t.t2d;
+    document.getElementById('t3-name').innerText = t.t3n; document.getElementById('t3-desc').innerText = t.t3d;
+    document.getElementById('t4-name').innerText = t.t4n; 
+    document.getElementById('lbl-p-name').innerText = t.p_name;
+    document.getElementById('lbl-p-id').innerText = t.p_id;
+    document.getElementById('lbl-p-edu').innerText = t.p_edu;
+    document.getElementById('lbl-p-dob').innerText = t.p_dob;
+    document.getElementById('lbl-p-age').innerText = t.p_age;
+    document.getElementById('t1-intro-title').innerText = t.t1n;
+    document.getElementById('t1-intro-text').innerText = t.t1_intro;
+    document.getElementById('t3-intro-title').innerText = t.t3n;
+    document.getElementById('t3-intro-text').innerText = t.t3_intro;
+    document.getElementById('t3-test-desc').innerText = t.t3_test;
+    document.getElementById('t4-intro-title').innerText = t.t4n;
+    document.getElementById('t4-intro-text').innerText = t.t4_intro;
+    document.getElementById('lbl-duration').innerText = t.duration;
+    document.getElementById('lbl-score').innerText = t.score;
+    document.getElementById('btn-add').innerText = t.btn_add;
+    document.getElementById('btn-finish-t1').innerText = t.btn_finish;
+    document.getElementById('btn-next-q').innerText = t.btn_next;
+    document.getElementById('btn-finish-t3').innerText = t.btn_finish;
+    document.getElementById('btn-start-t4').innerText = t.btn_start;
+    document.getElementById('btn-dl').innerText = t.btn_dl;
+    document.getElementById('btn-new').innerText = t.btn_new;
+    const eduSel = document.getElementById('p_edu');
+    eduSel.innerHTML = '';
+    t.edu_opts.forEach(opt => {
+        let op = document.createElement('option');
+        op.value = opt; op.innerText = opt;
+        eduSel.appendChild(op);
+    });
+}
+
+function showView(id) {
+    document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0,0);
+}
+
+function calcAge() {
+    const dobInput = document.getElementById('p_dob').value;
+    if(!dobInput) return;
+    const dob = new Date(dobInput);
+    const diff = Date.now() - dob.getTime();
+    const age = new Date(diff).getUTCFullYear() - 1970;
+    document.getElementById('p_age').value = age >= 0 ? age : 0;
+}
+
+function toggleAdmin() { document.getElementById('admin-panel').classList.toggle('hidden'); }
+function saveSettings() {
+    adminSettings.place = document.getElementById('set-place').value;
+    adminSettings.city = document.getElementById('set-city').value;
+    localStorage.setItem('cog_admin_set', JSON.stringify(adminSettings));
+    alert("Saved");
+}
+
+function initAssessment() {
+    session = { patient: {}, t1: { targets: [], entered: [], time: 0 }, t2: { details: [], score: 0, time: 0 }, t3: { targets: [], distractors: [], hits: 0, errors: 0, time: 0 }, t4: { score: 0, errors: 0, time: 60, responses: [] } };
+    const pool = [...POOLS[version]];
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    session.t1.targets = pool.slice(0, 10);
+    session.t3.targets = pool.slice(10, 20); 
+    let dists = pool.slice(20, 34); 
+    if(dists.length < 10) dists = dists.concat(session.t1.targets);
+    session.t3.distractors = dists.slice(0, 14);
+    showView('view-register');
+}
+
+function submitRegister() {
+    const name = document.getElementById('p_name').value;
+    if(!name) return alert(version==='en'?"Enter Name":"请输入姓名");
+    session.patient = {
+        name: name, id: document.getElementById('p_id').value,
+        gender: document.getElementById('p_gender').value,
+        dob: document.getElementById('p_dob').value,
+        age: document.getElementById('p_age').value,
+        edu: document.getElementById('p_edu').value,
+        date: new Date().toLocaleDateString()
+    };
+    preloadVoicePermission();
+    showView('view-t1-intro');
+}
+
+/* T1 */
+let t1StartTime = 0;
+function startWordSerial(phase) {
+    const targets = phase === 't1' ? session.t1.targets : session.t3.targets;
+    const viewId = 'view-serial-display';
+    showView(viewId);
+    const display = document.getElementById('serial-word');
+    const counter = document.getElementById('serial-counter');
+    let i = 0;
+    const interval = setInterval(() => {
+        if(i < targets.length) {
+            display.innerText = targets[i];
+            display.style.animation = 'none';
+            display.offsetHeight; 
+            display.style.animation = 'fadeIn 0.5s';
+            counter.innerText = `${i+1} / ${targets.length}`;
+            i++;
+        } else {
+            clearInterval(interval);
+            if(phase === 't1') startT1Recall();
+            else startT3Test();
+        }
+    }, 2000); 
+}
+
+function startT1Recall() {
+    showView('view-t1-recall');
+    t1StartTime = Date.now();
+    document.getElementById('t1-input').value = '';
+    document.getElementById('t1-chips').innerHTML = '';
+    updateProgress('t1-bar', 't1-progress-text', 0, 10); // Reset
+}
+
+function t1AddWord() {
+    const input = document.getElementById('t1-input');
+    let val = input.value.trim();
+    if(val) {
+        val = val.split(/[\s,，.。]/)[0];
+        session.t1.entered.push(val);
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.innerText = val;
+        // Delete handler
+        chip.onclick = () => { 
+            chip.remove(); 
+            session.t1.entered = session.t1.entered.filter(w=>w!==val);
+            updateProgress('t1-bar', 't1-progress-text', session.t1.entered.length, 10);
+        };
+        document.getElementById('t1-chips').appendChild(chip);
+        input.value = '';
+        input.focus();
+        
+        // Update Progress
+        updateProgress('t1-bar', 't1-progress-text', session.t1.entered.length, 10);
+    }
+}
+
+function endT1() {
+    session.t1.time = ((Date.now() - t1StartTime)/1000).toFixed(1);
+    startT2();
+}
+
+/* T2 */
+let t2Idx = 0;
+function startT2() {
+    showView('view-t2');
+    t2Idx = 0;
+    session.t2.startTime = Date.now();
+    session.t2.details = [];
+    loadT2Q();
+    if(window.t2Interval) clearInterval(window.t2Interval);
+    window.t2Interval = setInterval(()=>{
+        if(document.getElementById('view-t2').classList.contains('active'))
+            document.getElementById('t2-timer').innerText = ((Date.now()-session.t2.startTime)/1000).toFixed(1)+'s';
+    }, 100);
+}
+
+function loadT2Q() {
+    const qs = TEXT[version].t2_q;
+    const qText = qs[t2Idx];
+    document.getElementById('t2-q-text').innerText = qText;
+    const area = document.getElementById('t2-q-input');
+    area.innerHTML = '';
+    if(t2Idx === 1 || t2Idx === 3) {
+        const opts = t2Idx===1 ? 
+            (version==='en'?["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]:["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"]) :
+            (version==='en'?["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]:["周一","周二","周三","周四","周五","周六","周日"]);
+        const grid = document.createElement('div');
+        grid.className = 'grid-options';
+        opts.forEach(o => {
+            const b = document.createElement('button');
+            b.className = 'grid-btn';
+            b.innerText = o;
+            b.onclick = () => { t2Next(o); };
+            grid.appendChild(b);
+        });
+        area.appendChild(grid);
+    } else {
+        const inp = document.createElement('input');
+        inp.type = (t2Idx===0 || t2Idx===2) ? 'number' : 'text';
+        inp.id = 't2-inp';
+        area.appendChild(inp);
+        inp.focus();
+        inp.onkeypress = (e) => { if(e.key==='Enter') t2Next(inp.value); };
+    }
+}
+
+function t2Next(val) {
+    if(!val) val = document.getElementById('t2-inp')?.value;
+    if(!val) return;
+    const now = new Date();
+    let correct = false;
+    if(t2Idx===0) correct = parseInt(val) == now.getFullYear();
+    if(t2Idx===1) correct = true; 
+    if(t2Idx===2) correct = Math.abs(parseInt(val)-now.getDate())<=1;
+    if(t2Idx===3) correct = true; 
+    if(t2Idx===4) correct = val.includes(adminSettings.place); 
+    if(t2Idx===5) correct = val.includes(adminSettings.city); 
+    if(correct) session.t2.score++;
+    session.t2.details.push({q: t2Idx, ans: val, correct: correct});
+    t2Idx++;
+    if(t2Idx < 6) loadT2Q();
+    else {
+        clearInterval(window.t2Interval);
+        session.t2.time = ((Date.now()-session.t2.startTime)/1000).toFixed(1);
+        showView('view-t3-intro');
+    }
+}
+
+/* T3 */
+let t3StartTime = 0;
+function startT3Test() {
+    showView('view-t3-test');
+    t3StartTime = Date.now();
+    const grid = document.getElementById('t3-grid');
+    grid.innerHTML = '';
+    let all = [...session.t3.targets, ...session.t3.distractors];
+    all.sort(()=>Math.random()-0.5);
+    session.t3.selected = new Set();
+    updateProgress('t3-bar', 't3-progress-text', 0, 10); // Reset
+
+    all.forEach(w => {
+        const btn = document.createElement('button');
+        btn.className = 'grid-btn';
+        btn.innerText = w;
+        btn.onclick = () => {
+            if(session.t3.selected.has(w)) {
+                session.t3.selected.delete(w);
+                btn.classList.remove('selected');
+            } else {
+                session.t3.selected.add(w);
+                btn.classList.add('selected');
+            }
+            updateProgress('t3-bar', 't3-progress-text', session.t3.selected.size, 10);
+        };
+        grid.appendChild(btn);
+    });
+}
+
+function endT3() {
+    session.t3.time = ((Date.now()-t3StartTime)/1000).toFixed(1);
+    session.t3.selected.forEach(w => {
+        if(session.t3.targets.includes(w)) session.t3.hits++;
+        else session.t3.errors++;
+    });
+    showView('view-t4-intro');
+}
+
+/* T4 */
+let t4Timer = null;
+let t4Current = null;
+function startT4() {
+    showView('view-t4-test');
+    initSVG(); 
+    nextT4();
+    let time = 60; 
+    document.getElementById('t4-countdown').innerText = time;
+    session.t4.score = 0;
+    t4Timer = setInterval(()=>{
+        time--;
+        document.getElementById('t4-countdown').innerText = time;
+        if(time <= 0) endT4();
+    }, 1000);
+}
+
+function initSVG() {
+    const svg = document.getElementById('sdmt-svg');
+    svg.innerHTML = ''; 
+    const cx = 250, cy = 260, rInner = 80, rMid = 120, rOuter = 180;
+    const step = 144 / SDMT_MAP.length;
+    const startAngle = -72;
+    SDMT_MAP.forEach((item, index) => {
+        const angleStart = startAngle + (index * step);
+        const angleEnd = angleStart + step;
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        const pathData = describeArc(cx, cy, rInner, rOuter, angleStart, angleEnd);
+        const path = createPath(pathData, "arc-path");
+        path.id = `path-${item.n}`;
+        const midLine = createPath(describeArcLine(cx, cy, rMid, angleStart, angleEnd), "", "none", "var(--fan-stroke)");
+        const highlight = createPath(pathData, "highlight-border");
+        highlight.id = `highlight-${item.n}`;
+        const angleCenter = angleStart + (step / 2);
+        const symPos = polarToCartesian(cx, cy, (rMid + rOuter)/2, angleCenter);
+        const numPos = polarToCartesian(cx, cy, (rInner + rMid)/2, angleCenter);
+        g.append(path, midLine, highlight);
+        g.append(createText(item.s, symPos.x, symPos.y, angleCenter, 28, true));
+        g.append(createText(item.n, numPos.x, numPos.y, angleCenter, 22));
+        svg.appendChild(g);
+    });
+}
+
+function polarToCartesian(cx, cy, r, angle) {
+    const rad = (angle - 90) * Math.PI / 180.0;
+    return { x: cx + (r * Math.cos(rad)), y: cy + (r * Math.sin(rad)) };
+}
+function describeArc(x, y, rInner, rOuter, startAngle, endAngle) {
+    const startOuter = polarToCartesian(x, y, rOuter, endAngle);
+    const endOuter = polarToCartesian(x, y, rOuter, startAngle);
+    const startInner = polarToCartesian(x, y, rInner, endAngle);
+    const endInner = polarToCartesian(x, y, rInner, startAngle);
+    const largeArc = endAngle - startAngle <= 180 ? "0" : "1";
+    return `M ${startOuter.x} ${startOuter.y} A ${rOuter} ${rOuter} 0 ${largeArc} 0 ${endOuter.x} ${endOuter.y} L ${endInner.x} ${endInner.y} A ${rInner} ${rInner} 0 ${largeArc} 1 ${startInner.x} ${startInner.y} Z`;
+}
+function describeArcLine(x, y, r, startAngle, endAngle) {
+    const start = polarToCartesian(x, y, r, endAngle);
+    const end = polarToCartesian(x, y, r, startAngle);
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 0 0 ${end.x} ${end.y}`;
+}
+function createPath(d, cls, fill="white", stroke=null) {
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", d);
+    if(cls) p.setAttribute("class", cls);
+    if(fill!=="white") p.setAttribute("fill", fill);
+    if(stroke) p.setAttribute("stroke", stroke);
+    return p;
+}
+function createText(content, x, y, angle, size, adjustY=false) {
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", x); t.setAttribute("y", y);
+    t.setAttribute("transform", `rotate(${angle}, ${x}, ${y})`);
+    t.setAttribute("class", "arc-text");
+    t.style.fontSize = size + "px";
+    if(adjustY) t.setAttribute("dy", "-2");
+    t.textContent = content;
+    return t;
+}
+
+function nextT4() {
+    t4Current = SDMT_MAP[Math.floor(Math.random()*SDMT_MAP.length)];
+    document.getElementById('t4-current-symbol').innerText = t4Current.s;
+}
+
+function t4Input(n) {
+    const correct = n === t4Current.n;
+    if(correct) {
+        session.t4.score++;
+        const hl = document.getElementById(`highlight-${n}`);
+        if(hl) { hl.classList.add('active'); setTimeout(()=>hl.classList.remove('active'), 200); }
+    } else {
+        session.t4.errors++;
+    }
+    document.getElementById('t4-score').innerText = session.t4.score;
+    nextT4();
+}
+
+function endT4() {
+    clearInterval(t4Timer);
+    genReport();
+    saveToHistory();
+}
+
+function genReport() {
+    showView('view-report');
+    const p = session.patient;
+    const L = TEXT[version];
+    const t1Hits = session.t1.entered.filter(w => session.t1.targets.includes(w)).length;
+    let html = `
+    <table class="result-table">
+        <tr><th colspan="2">${L.p_name}: ${p.name || '-'} (${p.gender}, ${p.age})</th></tr>
+        <tr><td>${L.t1n}</td><td>${t1Hits}/10 (${L.time}: ${session.t1.time}s)</td></tr>
+        <tr><td>${L.t2n}</td><td>${session.t2.score}/6 (${L.time}: ${session.t2.time}s)</td></tr>
+        <tr><td>${L.t3n}</td><td>${L.score}: ${session.t3.hits} / Err: ${session.t3.errors}</td></tr>
+        <tr><td>${L.t4n}</td><td>${L.score}: ${session.t4.score} (60s)</td></tr>
+    </table>`;
+    document.getElementById('report-content').innerHTML = html;
+    document.getElementById('raw-data-area').value = generateCSV();
+}
+
+function saveToHistory() {
+    let history = JSON.parse(localStorage.getItem('cog_history') || "[]");
+    const summary = `${session.patient.name} (${session.patient.id}) - ${new Date().toLocaleString()}`;
+    history.push({summary: summary, data: session, version: version});
+    localStorage.setItem('cog_history', JSON.stringify(history));
+    loadHistory();
+}
+
+function loadHistory() {
+    let history = JSON.parse(localStorage.getItem('cog_history') || "[]");
+    const list = document.getElementById('history-list');
+    list.innerHTML = history.length === 0 ? "无数据 / No Data" : "";
+    history.reverse().forEach(h => {
+        let div = document.createElement('div');
+        div.style.borderBottom = "1px solid #eee";
+        div.style.padding = "5px";
+        div.innerHTML = `<div>${h.summary}</div>`;
+        list.appendChild(div);
+    });
+}
+
+function clearHistory() {
+    if(confirm("Confirm clear?")) {
+        localStorage.removeItem('cog_history');
+        loadHistory();
+    }
+}
+
+function generateCSV() {
+    const L = CSV_LABELS[version]; 
+    const p = session.patient;
+    let csv = `\uFEFF${L.section},${L.item},${L.value}\n`; 
+    csv += `${L.info},${L.name},${p.name}\n${L.info},${L.id},${p.id}\n${L.info},${L.gender},${p.gender}\n${L.info},${L.age},${p.age}\n${L.info},${L.dob},${p.dob}\n${L.info},${L.edu},${p.edu}\n${L.info},${L.date},${p.date}\n`;
+    
+    const t1Hits = session.t1.entered.filter(w => session.t1.targets.includes(w)).length;
+    csv += `${L.t1},${L.raw},${session.t1.entered.join(';')}\n${L.t1},${L.hits},${t1Hits}\n${L.t1},${L.time},${session.t1.time}\n`;
+    
+    csv += `${L.t2},${L.score},${session.t2.score}\n`;
+    session.t2.details.forEach(d => { csv += `${L.t2},Q${d.q+1}_${d.ans},${d.correct ? 1 : 0}\n`; });
+    
+    csv += `${L.t3},${L.hits},${session.t3.hits}\n${L.t3},${L.errors},${session.t3.errors}\n`;
+    csv += `${L.t4},${L.score},${session.t4.score}\n`;
+    return csv;
+}
+
+function exportData() {
+    if (!session.patient.name) return alert(version === 'en' ? "No data" : "无数据");
+    const csvContent = generateCSV();
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const safeName = (session.patient.id || 'ID') + '_' + (session.patient.name || 'Patient').replace(/[^a-z0-9\u4e00-\u9fa5]/gi, '');
+    const filename = `${safeName}_${version}.csv`;
+
+    if (navigator.msSaveBlob) { navigator.msSaveBlob(blob, filename); } 
+    else {
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+}
+
+function toggleBackup() {
+    const box = document.getElementById('backup-box');
+    box.style.display = box.style.display === 'block' ? 'none' : 'block';
+}
+
+function copyRawData() {
+    const text = document.getElementById('raw-data-area');
+    text.select();
+    document.execCommand("copy");
+    alert("Copied!");
+}
+</script>
+
+</body>
+</html>
